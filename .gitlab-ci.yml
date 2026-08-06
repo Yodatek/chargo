@@ -1,0 +1,65 @@
+stages:
+  - validate
+  - package
+  - deploy
+
+variables:
+  GIT_APP_REPO: /bu-collectivites/avenir/devsecops/charts/chargo.git
+
+# Lint, render, then PARSE the rendered manifest. The chart emits nothing but ArgoCD objects, so the
+# checks that matter are structural: documents actually separated, and every by-name reference resolving.
+# See hack/validate-render.py.
+helm:validate:
+  stage: validate
+  image:
+    name: alpine/helm:3.13.1
+    entrypoint: [""]
+  before_script:
+    - apk add --no-cache python3 py3-yaml
+  # Both strategies: `internal` renders Secrets, `external` renders ExternalSecrets, and the two go through
+  # different branches of every secret-bearing template.
+  script:
+    - helm lint . -f values.example.yaml
+    - helm lint . -f values.example-external.yaml
+    - helm template . -f values.example.yaml > /tmp/rendered-internal.yaml
+    - python3 hack/validate-render.py /tmp/rendered-internal.yaml
+    - helm template . -f values.example-external.yaml > /tmp/rendered-external.yaml
+    - python3 hack/validate-render.py /tmp/rendered-external.yaml
+  artifacts:
+    when: on_failure
+    paths:
+      - /tmp/rendered-internal.yaml
+      - /tmp/rendered-external.yaml
+    expire_in: 1 week
+
+helm:package:
+  stage: package
+  needs: ["helm:validate"]
+  image:
+    name: alpine/helm:3.13.1
+    entrypoint: [""]
+  script:
+    - helm package .
+    - chmod 777 chargo-*.tgz
+  artifacts:
+    paths:
+      - chargo-*.tgz
+  only:
+    - web
+
+helm:deploy:
+  stage: deploy
+  image: $HARBOR_REGISTRY_URL/bl-wemagnus-tools/bash:alpine3.20
+  needs: ["helm:package"]
+  before_script:
+    - apk add git curl
+    - export PROJECT_URL="https://gitlab-ci-token:${CI_RW_ACCESS_TOKEN}@gitlab.forge.berger-levrault.com${GIT_APP_REPO}"
+    - export VERSION=$(grep -m 1 ^version: Chart.yaml | awk '{print $2}')
+  script:
+    - 'curl --request POST --user gitlab-ci-token:$CI_JOB_TOKEN --form "chart=@chargo-${VERSION}.tgz" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/helm/api/stable/charts"'
+    - git config user.name "$GITLAB_USER_NAME"
+    - git config user.email "$GITLAB_USER_EMAIL"
+    - git tag -a "v${VERSION}" -m "Release ${VERSION}"
+    - git push "${PROJECT_URL}" "v${VERSION}"
+  only:
+    - web

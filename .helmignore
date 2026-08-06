@@ -1,0 +1,31 @@
+# Patterns to ignore when building packages.
+# This supports shell glob matching, relative path matching, and
+# negation (prefixed with !). Only one pattern per line.
+.DS_Store
+# Common VCS dirs
+.git/
+.gitignore
+.bzr/
+.bzrignore
+.hg/
+.hgignore
+.svn/
+# Common backup files
+*.swp
+*.bak
+*.tmp
+*~
+# Various IDEs
+.project
+.idea/
+*.tmproj
+
+# CI tooling and contributor guidance — not part of the chart
+hack/
+.gitlab-ci.yml
+CLAUDE.md
+# Brand assets: `icon` in Chart.yaml fetches the logo by URL, so the package needs none of this
+docs/
+# Per-platform values live in the deploying repo, not in the package
+values.example.yaml
+values.example-external.yaml

@@ -1,0 +1,96 @@
+{{- /*
+Repository registrations, in the ArgoCD namespace. One entry, one repository ArgoCD can read: the same
+notion ArgoCD itself uses, with no extra concept layered on top.
+
+Every repository declares its `credentials`, unless it is public.
+
+WHICH OBJECT IS RENDERED is decided by the credential itself: a pointer (`{key, property}`) anywhere in it
+means external-secrets fetches the material, so the object is an ExternalSecret; all-literal means a plain
+Secret. See `chargo.credentials`.
+*/ -}}
+{{- range $key, $r := .Values.repositories }}
+{{- if $r -}}
+{{- $name := printf "repo-%s" $key -}}
+{{- $type := $r.type | default "git" -}}
+{{- $url := $r.url | required (printf "chargo: repository %s has no url" $key) -}}
+{{- $c := dict "external" false "fields" (dict) -}}
+{{- if $r.credentials -}}
+{{- $c = include "chargo.credentials" (dict "root" $ "key" $r.credentials "ref" (printf "repository %s" $key)) | fromJson -}}
+{{- end -}}
+{{- /* No right-trim: the newline it keeps is what puts `---` at the start of its own line. */ -}}
+{{- $fields := $c.fields }}
+---
+{{- if $c.external }}
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: {{ $name }}
+  namespace: {{ $.Values.global.argocdNamespace }}
+  labels:
+    {{- include "chargo.labels" $ | nindent 4 }}
+spec:
+  refreshInterval: {{ $.Values.global.externalSecretRefreshInterval }}
+  secretStoreRef:
+    name: {{ $.Values.global.externalSecretStoreRef }}
+    kind: {{ $.Values.global.externalSecretStoreKind }}
+  target:
+    name: {{ $name }}
+    creationPolicy: Owner
+    {{- /* The ArgoCD label has to land on the Secret external-secrets PRODUCES, not on this object —
+           ArgoCD never looks at the ExternalSecret. Same for the url and type, which are not secret and
+           are written here as literals. */}}
+    template:
+      metadata:
+        labels:
+          argocd.argoproj.io/secret-type: repository
+      data:
+        url: {{ $url | quote }}
+        type: {{ $type | quote }}
+        {{- if eq $type "helm" }}
+        name: {{ $r.name | default $key | quote }}
+        {{- end }}
+        {{- /* A fetched field is referenced by its secretKey below; a literal one is written as it is.
+               These braces are external-secrets' template engine, not Helm's — Helm is done by now. */}}
+        {{- range $f := list "username" "password" }}
+        {{- $spec := index $fields $f }}
+        {{ $f }}: {{ if $spec.ref }}{{ include "chargo.esoRef" $f | quote }}{{ else }}{{ $spec.value | quote }}{{ end }}
+        {{- end }}
+  data:
+    {{- range $f := list "username" "password" }}
+    {{- $spec := index $fields $f }}
+    {{- if $spec.ref }}
+    - secretKey: {{ $f }}
+      remoteRef:
+        key: {{ $spec.key | quote }}
+        property: {{ $spec.property | quote }}
+        {{- if $spec.version }}
+        version: {{ $spec.version | quote }}
+        {{- end }}
+    {{- end }}
+    {{- end }}
+{{- else }}
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: {{ $name }}
+  namespace: {{ $.Values.global.argocdNamespace }}
+  labels:
+    {{- include "chargo.labels" $ | nindent 4 }}
+    argocd.argoproj.io/secret-type: repository
+{{- /* stringData: Kubernetes encodes it, so the rendered manifest stays diff-readable. */}}
+stringData:
+  url: {{ $url | quote }}
+  type: {{ $type | quote }}
+  {{- if eq $type "helm" }}
+  name: {{ $r.name | default $key | quote }}
+  {{- end }}
+  {{- range $f := list "username" "password" }}
+  {{- $spec := index $fields $f }}
+  {{- if $spec }}
+  {{ $f }}: {{ $spec.value | quote }}
+  {{- end }}
+  {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
