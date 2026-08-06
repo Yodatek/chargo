@@ -1,0 +1,21 @@
+{{- /*
+One Application per entry of .Values.applications — one path, one release, nothing to discover.
+
+Same spec builder as an ApplicationSet: what an Application lacks is the generator, so `path` replaces the
+discovery block and the goTemplate expressions become plain strings.
+*/ -}}
+{{- range $key, $entry := .Values.applications }}
+{{- if $entry -}}
+{{- $e := mergeOverwrite (deepCopy $.Values.objectDefaults) (deepCopy $entry) -}}
+{{- /* No right-trim here: the newline it keeps is what puts `---` at the start of its own line. */ -}}
+{{- $ctx := dict "root" $ "key" $key "entry" $e "mode" "app" }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  namespace: {{ $.Values.global.argocdNamespace }}
+  {{- include "chargo.appMetadata" $ctx | nindent 2 }}
+spec:
+  {{- include "chargo.appSpec" $ctx | nindent 2 }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,77 @@
+{{- /*
+One ApplicationSet per entry of .Values.applicationsets — one App per discovered leaf.
+
+DISCOVERY, `helm` source: `discovery.include` lists directories scanned RECURSIVELY; each entry matches
+the leaf file directly under it AND the same file at any depth below. Absent → the whole repository.
+DISCOVERY, `directory` source: `discovery.include` IS the path list, passed verbatim.
+
+The excluded directories are the object's `discovery.exclude` plus the shared-overlay directory itself:
+<shared> holds values that every leaf stacks, so it must never become a leaf of its own.
+*/ -}}
+{{- range $key, $entry := .Values.applicationsets }}
+{{- if $entry -}}
+{{- $e := mergeOverwrite (deepCopy $.Values.objectDefaults) (deepCopy $entry) -}}
+{{- $ctx := dict "root" $ "key" $key "entry" $e "mode" "set" -}}
+{{- $disc := $e.discovery -}}
+{{- $shared := $disc.shared | default "_shared" -}}
+{{- $excludes := concat ($disc.exclude | default list) (list $shared) | uniq -}}
+{{- $content := include "chargo.repoURL" (dict "root" $ "key" (required (printf "chargo: applicationset %s has no contentRepo" $key) $e.contentRepo) "ref" (printf "applicationset %s" $key)) -}}
+{{- /* No right-trim on the last setup action: the newline it keeps is what puts `---` at the start of its
+       own line. Glued to the previous object's last line it would stop separating documents, and the two
+       objects would share one YAML document — the second silently overwriting the first. */ -}}
+{{- $revision := $e.revision | default $.Values.global.revision }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: {{ include "chargo.objectName" $ctx }}
+  namespace: {{ $.Values.global.argocdNamespace }}
+  labels:
+    {{- include "chargo.labels" $ | nindent 4 }}
+    app: {{ $e.app | default $key }}
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  {{- if dig "preserveResourcesOnDeletion" $.Values.global.preserveResourcesOnDeletion $e }}
+  {{- /* Deleting THIS object — a dropped values entry, a renamed key — leaves the workloads of its
+         Applications in place. Deleting a LEAF from the content repository still prunes normally, that
+         is the App-level finalizer. */}}
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+  {{- end }}
+  generators:
+    - git:
+        repoURL: {{ $content }}
+        revision: {{ $revision }}
+        {{- if eq ($e.sourceType | default "registryChart") "directory" }}
+        {{- /* `include` is passed verbatim: [dozzle, quotas] gives one App per named directory, ['*'] one
+               per top-level directory. Avoid ['**'] — each App applies its directory with recurse: true,
+               so a parent and its children would apply the same objects twice. */}}
+        directories:
+          {{- range $inc := $disc.include | default (list "*") }}
+          - path: {{ $inc | quote }}
+          {{- end }}
+          {{- range $d := $excludes }}
+          - path: "**/{{ $d }}"
+            exclude: true
+          - path: "**/{{ $d }}/**"
+            exclude: true
+          {{- end }}
+        {{- else }}
+        files:
+          {{- range $inc := $disc.include | default (list "**") }}
+          - path: "{{ $inc }}/{{ $disc.leaf | default "values.yaml" }}"
+          - path: "{{ $inc }}/**/{{ $disc.leaf | default "values.yaml" }}"
+          {{- end }}
+          {{- range $d := $excludes }}
+          - path: "**/{{ $d }}/**"
+            exclude: true
+          {{- end }}
+        {{- end }}
+  template:
+    metadata:
+      {{- include "chargo.appMetadata" $ctx | nindent 6 }}
+    spec:
+      {{- include "chargo.appSpec" $ctx | nindent 6 }}
+{{- end }}
+{{- end }}

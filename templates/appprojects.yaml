@@ -1,0 +1,71 @@
+{{- /*
+One AppProject per distinct `project`, built from the UNION of what every object bound to it needs.
+
+This is why the projects are rendered here rather than alongside each object: two ApplicationSets may share
+one project — the raw and the chart-based devsecops trees do — and each knows only its own destinations and
+its own repositories. Rendering one AppProject per object would make the last one applied overwrite the
+others' allowances; ArgoCD would then refuse whatever the loser needed.
+*/ -}}
+{{- $projects := dict -}}
+{{- range $kind := list "applicationsets" "applications" -}}
+{{- range $key, $entry := (index $.Values $kind) -}}
+{{- if $entry -}}
+{{- $e := mergeOverwrite (deepCopy $.Values.objectDefaults) (deepCopy $entry) -}}
+{{- $name := $e.project | default $key -}}
+{{- $app := $e.app | default $key -}}
+{{- $p := index $projects $name | default (dict "destinations" list "sourceRepos" list "apps" list) -}}
+{{- /* Default destination: the namespaces this object's own naming can produce. An object writing
+       elsewhere — an object carrying its TARGET namespace, a quota for another team's namespace —
+       declares `destinations` explicitly. */ -}}
+{{- $dests := $e.destinations | default (list (dict "server" $.Values.global.clusterServer "namespace" (printf "%s-*" $app))) -}}
+{{- $_ := set $p "destinations" (concat $p.destinations $dests) -}}
+{{- $src := $e.sourceType | default "registryChart" -}}
+{{- $repos := list (include "chargo.repoURL" (dict "root" $ "key" $e.contentRepo "ref" (printf "%s %s" $kind $key))) -}}
+{{- /* Only registryChart declares its charts here; the other types read them from the content repository,
+       and asking chartList for coordinates they do not have would report a missing version instead of the
+       real mistake. */ -}}
+{{- if eq $src "registryChart" -}}
+{{- range $c := (include "chargo.chartList" (dict "root" $ "key" $key "entry" $e) | fromJsonArray) -}}
+{{- $repos = append $repos $c.url -}}
+{{- end -}}
+{{- end -}}
+{{- /* A Chart.yaml pulls dependencies from repositories this file never sees, so the project cannot
+       enumerate them. */ -}}
+{{- if eq $src "gitChart" -}}
+{{- $repos = append $repos "*" -}}
+{{- end -}}
+{{- $_ := set $p "sourceRepos" (concat $p.sourceRepos $repos) -}}
+{{- $_ := set $p "apps" (append $p.apps $key) -}}
+{{- $_ := set $projects $name $p -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- range $name, $p := $projects }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: {{ $name }}
+  namespace: {{ $.Values.global.argocdNamespace }}
+  labels:
+    {{- include "chargo.labels" $ | nindent 4 }}
+spec:
+  description: {{ printf "%s on %s — %s" $name $.Values.global.platform (join ", " (uniq $p.apps)) | quote }}
+  sourceRepos:
+    {{- range $r := uniq $p.sourceRepos }}
+    - {{ $r | quote }}
+    {{- end }}
+  destinations:
+    {{- range $d := uniq $p.destinations }}
+    - server: {{ $d.server | default $.Values.global.clusterServer }}
+      namespace: {{ $d.namespace | quote }}
+    {{- end }}
+  {{- /* The generated Apps deploy operators, CRDs and namespace-scoped workloads alike; narrowing this
+         belongs to a later hardening pass, per project, once what each one actually applies is known. */}}
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+{{- end }}

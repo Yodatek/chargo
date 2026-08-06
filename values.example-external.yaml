@@ -1,0 +1,35 @@
+# EXAMPLE — the same platform with the credential as a POINTER. Exists so CI exercises the branch that
+# renders an ExternalSecret instead of a plain Secret: nothing in this file is secret, the material stays
+# in the store, so it can live in clear in git.
+#
+# Nothing declares a strategy. The shape of `password` is what decides.
+
+global:
+  platform: int
+
+credentials:
+  gitlab-forge:
+    # Mixed on purpose, which is the normal case: the account name is not secret, its token is. The
+    # rendered ExternalSecret writes the username as a literal and fetches only the password.
+    username: CAPTAIN_RIMAFLOWA
+    password:
+      key: /static-secrets/data/devsecops/int
+      property: GITLAB_FORGE_PASSWORD
+
+repositories:
+  content-devsecops:
+    type: git
+    url: https://gitlab.forge.berger-levrault.com/bu-collectivites/avenir/devsecops/gitops/argocd/internal.git
+    credentials: gitlab-forge
+
+applicationsets:
+  devsecops:
+    app: devsecops
+    project: devsecops
+    sourceType: directory
+    naming: basename
+    contentRepo: content-devsecops
+    discovery:
+      include: [raw/*]
+    destinations:
+      - namespace: "*"

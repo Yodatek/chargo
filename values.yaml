@@ -1,0 +1,185 @@
+# chargo — CHART DEFAULTS. One release renders every ArgoCD object of ONE platform.
+#
+# A deploying repo supplies a per-platform values file (int.yaml, uat.yaml, prod.yaml, pra.yaml) that
+# declares `global.platform`, the credentials, the repositories and the ArgoCD objects. Everything below is
+# a default this chart already knows.
+#
+#   helm template chargo . -f int.yaml     # what the platform will receive, on a laptop, offline
+#
+# FOUR DICTIONARIES, referenced BY NAME:
+#   credentials.<name>      WHO we are        — one identity, reused by several repositories
+#   repositories.<name>     WHAT we read from — one URL, registered once in ArgoCD
+#   applicationsets.<name>  N Apps discovered from a repository
+#   applications.<name>     ONE App, one path — nothing to discover
+#
+# The indirection is the point: a token rotates in ONE place, and a repository is registered once however
+# many objects read it.
+
+global:
+  # REQUIRED. Suffixes every ApplicationSet/Application name, so two platforms never collide when they
+  # share an ArgoCD instance, and labels every rendered object.
+  platform: ""
+
+  # Namespace holding the ArgoCD objects (ApplicationSet, Application, AppProject, repository secrets).
+  argocdNamespace: argocd
+
+  # Cluster the generated Applications target. Kept as a value: a platform may later deploy to a remote
+  # cluster without touching a template.
+  clusterServer: https://kubernetes.default.svc
+
+  # Default git revision the generated Applications track. Overridable per object.
+  revision: main
+
+  # --- DELETION POLICY --------------------------------------------------------------------------
+  # Both keys are overridable per object. They govern two DIFFERENT deletions.
+  #
+  # cascadeDelete — a LEAF disappears from the content repository. The generated App carries the
+  # resources finalizer, so its workloads are pruned. This is the normal GitOps behaviour.
+  cascadeDelete: true
+  #
+  # preserveResourcesOnDeletion — the APPLICATIONSET itself disappears, because its entry left the values
+  # file. An ApplicationSet owns its Applications, so a mistyped key or a dropped entry would otherwise
+  # take the whole platform's workloads with it. `true` stops the cascade at the Applications. Set it to
+  # `false` only where a full teardown is the intent.
+  preserveResourcesOnDeletion: true
+
+  # --- SECRET STORE -------------------------------------------------------------------------------
+  # Read only by the credentials that declare a `{key, property}` pointer; ignored by the literal ones.
+  # `externalSecretStoreRef` must name a ClusterSecretStore that exists in the cluster:
+  #   kubectl get clustersecretstores
+  externalSecretRefreshInterval: 1h
+  externalSecretStoreRef: clustersecretstores.external-secrets.io
+  externalSecretStoreKind: ClusterSecretStore
+
+# --- Identities -----------------------------------------------------------------------------------
+# Forge accounts, used to clone the content repositories and to pull charts. NOT registry identities: an
+# image pull secret belongs to the chart that owns the workload.
+#
+# Each field is EITHER a literal string OR a pointer into the secret store. THE SHAPE DECIDES how the
+# credential is delivered; there is no strategy to declare alongside it, and therefore nothing that can
+# contradict it.
+#
+#   credentials:
+#     gitlab-forge:
+#       username: CAPTAIN_RIMAFLOWA          # an account name is not secret
+#       password:                            # its token is
+#         key: /static-secrets/data/devsecops/int
+#         property: GITLAB_FORGE_PASSWORD    # optional, defaults to the field name
+#         version: ""                        # optional
+#
+# A pointer carries external-secrets' own field names, so it transposes to a `remoteRef` unchanged:
+# `key` is the entry in the store, `property` the field inside it.
+#
+# All literal   → a plain Secret. The values file then carries the material, so it is SOPS-encrypted and
+#                 the ArgoCD repo-server needs a decryptor (KSOPS, helm-secrets) to read it at all.
+# Any pointer   → an ExternalSecret: only the pointed fields are fetched, the literals are written as
+#                 they are, and the material never enters the values file — which can then stay in clear
+#                 in git, so the ArgoCD repo-server needs no SOPS decryptor to read it.
+credentials: {}
+
+# --- Repositories registered in ArgoCD --------------------------------------------------------------
+# repositories.<name>:
+#   type:        git | helm
+#   url:         clone URL, or the helm registry base URL
+#   name:        helm only — chart name (defaults to the dictionary key)
+#   version:     helm only — default chart version, overridable per object
+#   credentials: key of `credentials`; omit ONLY for a public repository, which ArgoCD pulls anonymously
+repositories: {}
+
+# --- ApplicationSets ------------------------------------------------------------------------------
+# applicationsets.<name>: merged OVER `objectDefaults`, rendered as one ApplicationSet + its AppProject.
+#
+#   name:            object name; defaults to <key>-<platform>
+#   app:             prefix of the generated App names AND of their namespaces; defaults to <key>
+#   project:         AppProject to create and bind; defaults to <key>
+#   sourceType:      WHERE THE CHART COMES FROM. Declaring chart coordinates under a type that does not
+#                    read them stops the render — a version nobody reads is worse than an error.
+#
+#                    registryChart (default)  from a Helm registry, coordinates HERE (chartRepo / charts).
+#                                             Values stay flat, and N charts fit in one object.
+#                    gitChart                 the leaf directory IS the chart — it carries a Chart.yaml
+#                                             and ArgoCD resolves its `dependencies`. Chart coordinates
+#                                             live in the content repo, so adding a tool is a commit
+#                                             there and never a redeploy of this chart. A dependency's
+#                                             values NEST under its name, which is the cost.
+#                    directory                raw YAML applied as committed — no chart, no value stacking
+#
+#   naming:          path (default) | basename
+#                    path      → App <app>-<segments joined by '-'>, namespace <app>-<first segment>
+#                    basename  → App <app>-<leaf directory>,         namespace <app>-<leaf directory>
+#                    A leaf overrides its namespace with a `namespace:` key, which is how two directories
+#                    land two chart releases in one namespace.
+#   contentRepo:     key of `repositories`, type git — the content ArgoCD watches. Always required; with
+#                    gitChart it is also where the chart itself lives.
+#   chartRepo:       registryChart only — key of `repositories`, type helm; shorthand for a single-chart
+#                    `charts` list
+#   chartVersion:    registryChart only — overrides the version declared on that repository
+#   charts:          registryChart only — N charts in ONE object, each with its own FLAT values files,
+#                    where an umbrella Chart.yaml would nest every file under a subchart key:
+#                      - repo: we-chart          # key of `repositories`
+#                        version: "3.0.0-1"      # optional, overrides the repository default
+#                        releaseName: redis      # optional, defaults to the chart name
+#                        valueFiles: [...]       # optional, defaults to discovery.valueFiles
+#   namespace:       pins the destination namespace instead of deriving it. The only way to set one when
+#                    the content carries no leaf file to read it from, as with raw manifests.
+#   releaseName:     gitChart / Application; defaults to the leaf directory, or to <app> outside a set
+#   revision:        overrides global.revision
+#   destinations:    AppProject destinations; defaults to `<app>-*` on global.clusterServer
+#   discovery:       see objectDefaults.discovery
+applicationsets: {}
+
+# --- Applications ---------------------------------------------------------------------------------
+# applications.<name>: same contract, minus `discovery` and plus:
+#   path:            the single path in the content repository to deploy
+#                    (with gitChart, the directory that carries Chart.yaml)
+#
+# `ApplicationSet.spec.template.spec` and `Application.spec` are the same object, so both dictionaries
+# share one spec builder: what differs is the generator, which only an ApplicationSet has.
+applications: {}
+
+# --- Defaults merged UNDER every entry of the two dictionaries above -------------------------------
+# A per-object key overrides the value here; dictionaries merge, lists replace.
+objectDefaults:
+  sourceType: registryChart
+  naming: path
+
+  discovery:
+    # Directories scanned RECURSIVELY: each entry <d> matches <d>/<leaf> and <d>/**/<leaf>.
+    # `sourceType: directory` passes this list verbatim to the directories generator instead.
+    include: []
+    # Never treated as a leaf, on top of the object's own exclusions.
+    exclude: [base, _shared]
+    # Shared-overlay directory, stacked at each level and itself excluded from the leaves.
+    shared: _shared
+    # How many levels of the leaf path can carry a <shared> directory. 4 covers any tree in use; raise it
+    # only for a deeper one. A level beyond the leaf's own depth collapses onto the leaf, so it points at a
+    # <leaf>/<shared> that does not exist and is skipped — harmless, and visible in the rendered object.
+    depth: 4
+    # File the git generator PARSES — its keys become template parameters, and it is what selects a
+    # directory as a leaf: a directory without it is simply not an App.
+    leaf: values.yaml
+    # Files Helm stacks, each ignored if absent (last wins). A <shared> is read at EVERY level of the leaf
+    # path, up to `depth`:
+    #   <shared>/  <  <overlay>/  <  dev/<shared>/  <  dev/blue/<shared>/  <  dev/blue/election/
+    valueFiles: [values.yaml]
+    # Directories an environment reuses then overrides, pra over prod.
+    overlays: []
+
+  # --- NO WORKLOAD SECRET HERE --------------------------------------------------------------------
+  # chargo renders nothing outside the ArgoCD namespace. A secret a workload needs belongs beside that
+  # workload, declared by whatever the workload is declared with:
+  #   a chart      we-chart creates it from its own `global.pullSecrets` and references it
+  #   raw YAML     an `ExternalSecret` committed in the content repository, next to the Deployment. It
+  #                holds a POINTER, not the material, so it needs no SOPS decryptor to sit in git.
+  #
+  # Beyond ownership there is a structural reason: a glob discovery (`raw/*`) cannot be enumerated at
+  # render time, so chargo could never reach a namespace it only learns about at sync time. Whatever runs
+  # inside that namespace always can.
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ignoreMissingValueFiles=true
