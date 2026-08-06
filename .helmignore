@@ -23,6 +23,7 @@
 # CI tooling and contributor guidance — not part of the chart
 hack/
 .gitlab-ci.yml
+.github/
 CLAUDE.md
 # Brand assets: `icon` in Chart.yaml fetches the logo by URL, so the package needs none of this
 docs/

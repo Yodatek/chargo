@@ -1,12 +1,12 @@
 apiVersion: v2
 name: chargo
-description: Renders the ArgoCD objects of one platform — ApplicationSets, Applications, AppProjects, repository credentials and image pull secrets
+description: Renders the ArgoCD objects of one platform — ApplicationSets, Applications, AppProjects and repository credentials
 type: application
 version: 0.1.0
 appVersion: "0.1.0"
-# Rendered by helm UIs and by ArgoCD. Points at the raw file of this repository's default branch, so it
-# follows the logo without a release. Regenerate with docs/build-logo.py.
-icon: https://gitlab.forge.berger-levrault.com/bu-collectivites/avenir/devsecops/charts/chargo/-/raw/main/docs/logo.png
+# Rendered by helm UIs and by ArgoCD. Points at the raw file of the default branch, so it follows the
+# logo without a release. Regenerate with docs/build-logo.py.
+icon: https://raw.githubusercontent.com/Yodatek/chargo/main/docs/logo.png
 keywords:
   - argocd
   - gitops

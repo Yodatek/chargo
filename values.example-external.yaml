@@ -8,27 +8,27 @@ global:
   platform: int
 
 credentials:
-  gitlab-forge:
+  forge:
     # Mixed on purpose, which is the normal case: the account name is not secret, its token is. The
     # rendered ExternalSecret writes the username as a literal and fetches only the password.
-    username: CAPTAIN_RIMAFLOWA
+    username: chargo-bot
     password:
-      key: /static-secrets/data/devsecops/int
-      property: GITLAB_FORGE_PASSWORD
+      key: secret/data/platform/int
+      property: FORGE_TOKEN
 
 repositories:
-  content-devsecops:
+  content-tooling:
     type: git
-    url: https://gitlab.forge.berger-levrault.com/bu-collectivites/avenir/devsecops/gitops/argocd/internal.git
-    credentials: gitlab-forge
+    url: https://gitlab.example.com/acme/platform/tooling/argocd/internal.git
+    credentials: forge
 
 applicationsets:
-  devsecops:
-    app: devsecops
-    project: devsecops
+  tooling:
+    app: tooling
+    project: tooling
     sourceType: directory
     naming: basename
-    contentRepo: content-devsecops
+    contentRepo: content-tooling
     discovery:
       include: [raw/*]
     destinations:

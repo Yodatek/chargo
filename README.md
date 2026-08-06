@@ -47,10 +47,10 @@ Every entry is merged over `objectDefaults`, so it declares only what differs:
 
 ```yaml
 applicationsets:
-  wetemp:
-    project: wetemp
-    contentRepo: content-wetemplates
-    chartRepo: we-chart
+  webapp:
+    project: webapp
+    contentRepo: content-webapp
+    chartRepo: base-chart
     chartVersion: "3.0.0-1"
     discovery:
       include: [dev, test]
@@ -64,11 +64,11 @@ contradict it.
 
 ```yaml
 credentials:
-  gitlab-forge:
-    username: CAPTAIN_RIMAFLOWA          # an account name is not secret
+  forge:
+    username: chargo-bot                 # an account name is not secret
     password:                            # its token is
-      key: /static-secrets/data/devsecops/int
-      property: GITLAB_FORGE_PASSWORD    # optional, defaults to the field name
+      key: secret/data/platform/int
+      property: FORGE_TOKEN              # optional, defaults to the field name
 ```
 
 | the credential is | chargo renders | the values file |
@@ -93,8 +93,8 @@ the workload itself is declared with:
 
 | the workload is | its secret is |
 | --- | --- |
-| a we-chart release | created by we-chart from its own `global.pullSecrets` |
-| an upstream chart | created by a sibling we-chart directory declaring the same `namespace:` |
+| a chart you own | created by that chart from its own `global.pullSecrets` |
+| an upstream chart | created by a sibling chart declaring the same `namespace:` |
 | raw YAML | an `ExternalSecret` committed next to the Deployment — a pointer, not the material, so it needs no SOPS decryptor to sit in git |
 
 Beyond ownership there is a structural reason: a glob discovery (`raw/*`) cannot be enumerated at render

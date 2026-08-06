@@ -2,7 +2,7 @@
 One AppProject per distinct `project`, built from the UNION of what every object bound to it needs.
 
 This is why the projects are rendered here rather than alongside each object: two ApplicationSets may share
-one project — the raw and the chart-based devsecops trees do — and each knows only its own destinations and
+one project — a raw tree and a chart-based one often do — and each knows only its own destinations and
 its own repositories. Rendering one AppProject per object would make the last one applied overwrite the
 others' allowances; ArgoCD would then refuse whatever the loser needed.
 */ -}}

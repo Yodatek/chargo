@@ -1,0 +1,64 @@
+name: ci
+
+# The chart's whole promise is that `helm template` tells you what a platform will receive. This runs that
+# promise on every change, for BOTH credential shapes — literal and store pointer go through different
+# branches of every secret-bearing template.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        values: [values.example.yaml, values.example-external.yaml]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.3
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install pyyaml
+
+      - name: helm lint
+        run: helm lint . -f ${{ matrix.values }}
+
+      # A parser, not a grep: a glued `---` merges two objects into one document and silently drops the
+      # first. See hack/validate-render.py for the invariants.
+      - name: Render and validate
+        run: |
+          helm template chargo . -f ${{ matrix.values }} > rendered.yaml
+          python3 hack/validate-render.py rendered.yaml
+
+      - name: Keep the rendered manifest when it fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendered-${{ matrix.values }}
+          path: rendered.yaml
+          retention-days: 7
+
+  logo:
+    # docs/logo.svg and docs/banner.svg are generated: the tapered arms are ~60-point polygons nobody edits
+    # by hand. This fails if someone edited the output instead of docs/build-logo.py.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 docs/build-logo.py
+      - name: Check the committed SVGs match the generator
+        run: git diff --exit-code -- docs/
