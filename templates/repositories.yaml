@@ -49,6 +49,9 @@ spec:
         {{- if eq $type "helm" }}
         name: {{ $r.name | default $key | quote }}
         {{- end }}
+        {{- if $r.enableOCI }}
+        enableOCI: "true"
+        {{- end }}
         {{- /* A fetched field is referenced by its secretKey below; a literal one is written as it is.
                These braces are external-secrets' template engine, not Helm's — Helm is done by now. */}}
         {{- range $f := list "username" "password" }}
@@ -84,6 +87,9 @@ stringData:
   type: {{ $type | quote }}
   {{- if eq $type "helm" }}
   name: {{ $r.name | default $key | quote }}
+  {{- end }}
+  {{- if $r.enableOCI }}
+  enableOCI: "true"
   {{- end }}
   {{- range $f := list "username" "password" }}
   {{- $spec := index $fields $f }}

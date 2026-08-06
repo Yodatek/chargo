@@ -1,0 +1,50 @@
+name: release
+
+# Publishes the chart as an OCI artifact on ghcr.io and attaches the .tgz to a GitHub Release.
+# Inert until a tag is pushed:
+#
+#   git tag -a v0.1.0 -m "chargo 0.1.0" && git push origin v0.1.0
+#
+# The tag must match `version` in Chart.yaml — a mismatch publishes a version nobody asked for, so it is a
+# hard failure rather than a surprise in the registry.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.3
+
+      - name: Read the chart version and check it against the tag
+        id: chart
+        run: |
+          version="$(helm show chart . | awk '/^version:/ {print $2}')"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} does not match Chart.yaml version ${version}"
+            exit 1
+          fi
+
+      - run: helm package .
+
+      # OCI references are lowercase; the org name is not necessarily.
+      - name: Push to ghcr.io
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+          helm push "chargo-${{ steps.chart.outputs.version }}.tgz" "oci://ghcr.io/${owner}/charts"
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: chargo-${{ steps.chart.outputs.version }}.tgz
+          generate_release_notes: true

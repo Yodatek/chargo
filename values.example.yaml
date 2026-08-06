@@ -1,8 +1,8 @@
-# EXAMPLE — the `int` platform with placeholder material. Rendered by CI (`helm template . -f
-# values.example.yaml`) so every shape the chart supports stays exercised: an ApplicationSet over a chart,
-# one over raw manifests, one whose leaves declare their own chart, and a standalone Application.
+# EXAMPLE — one platform, with placeholder material. Rendered by CI so every shape the chart supports stays
+# exercised: an ApplicationSet over a registry chart, one over raw manifests, one over charts that live in
+# the content repository, and a standalone Application.
 #
-# The real per-platform files live in the deploying repo, where the material is either vaulted or replaced
+# The real per-platform files live in the deploying repo, where the material is either encrypted or replaced
 # by a {key, property} pointer.
 
 global:
@@ -11,78 +11,78 @@ global:
   revision: main
 
 credentials:
-  # One forge token for two uses: cloning the content repositories, and pulling charts from the helm
-  # registry. Rotating it touches this entry only. No registry identity here — the pull secret belongs to
-  # the chart that owns the workload.
+  # One forge token for two uses: cloning the content repositories, and pulling charts from the registry.
+  # Rotating it touches this entry only. No registry identity here — an image pull secret belongs to the
+  # chart that owns the workload.
   #
-  # A literal password: this file would be SOPS-encrypted, or rendered from Ansible vault. See
-  # values.example-external.yaml for the same credential as a pointer.
-  gitlab-forge:
-    username: CAPTAIN_RIMAFLOWA
+  # A literal password: this file would be SOPS-encrypted. See values.example-external.yaml for the same
+  # credential as a pointer.
+  forge:
+    username: chargo-bot
     password: PLACEHOLDER
 
 repositories:
-  content-wetemplates:
+  content-webapp:
     type: git
-    url: https://gitlab.forge.berger-levrault.com/bu-collectivites/avenir/we-templates/argocd-apps.git
-    credentials: gitlab-forge
+    url: https://gitlab.example.com/acme/platform/webapp/argocd-apps.git
+    credentials: forge
 
   # Platform `int` reads the repository named `internal`: the platform name and the repository name are
   # unrelated, which is exactly why the URL is declared rather than derived.
-  content-devsecops:
+  content-tooling:
     type: git
-    url: https://gitlab.forge.berger-levrault.com/bu-collectivites/avenir/devsecops/gitops/argocd/internal.git
-    credentials: gitlab-forge
+    url: https://gitlab.example.com/acme/platform/tooling/argocd/internal.git
+    credentials: forge
 
-  we-chart:
+  base-chart:
     type: helm
-    url: https://gitlab.forge.berger-levrault.com/api/v4/projects/5599/packages/helm/stable
-    name: we-chart
+    url: https://gitlab.example.com/api/v4/projects/1234/packages/helm/stable
+    name: base-chart
     version: "3.0.0"
-    credentials: gitlab-forge
+    credentials: forge
 
 applicationsets:
-  # --- One chart, many leaves ---------------------------------------------------------------------
-  # dev/values.yaml → App wetemp-dev (ns wetemp-dev); dev/redis/values.yaml → App wetemp-dev-redis, same
+  # --- One registry chart, many leaves --------------------------------------------------------------
+  # dev/values.yaml → App webapp-dev (ns webapp-dev); dev/redis/values.yaml → App webapp-dev-redis, same
   # namespace. What changes per platform is this discovery scope, not the content repository.
-  # The pull secret is we-chart's business: its leaves declare `global.pullSecrets`.
-  wetemp:
-    project: wetemp
-    contentRepo: content-wetemplates
-    chartRepo: we-chart
+  # The pull secret is the chart's business: its leaves declare `global.pullSecrets`.
+  webapp:
+    project: webapp
+    contentRepo: content-webapp
+    chartRepo: base-chart
     chartVersion: "3.0.0-1"
     discovery:
       include: [dev, test]
       valueFiles: [values.yaml, config.yaml, secrets.yaml]
 
-  # --- Raw manifests ------------------------------------------------------------------------------
+  # --- Raw manifests ---------------------------------------------------------------------------------
   # One App per directory under raw/, named after the tool rather than after the tree it sits in.
-  # Destinations are wider than devsecops-* because the objects under raw/weresources carry their TARGET
-  # namespace — a quota for wegf-dev lands in wegf-dev.
+  # Destinations are wider than tooling-* because the objects under raw/quotas carry their TARGET
+  # namespace — a quota for webapp-dev lands in webapp-dev.
   # Secrets these objects need are declared WITH them, in the content repository: an ExternalSecret next to
   # the Deployment. Nothing about them appears here.
-  devsecops:
-    app: devsecops
-    project: devsecops
+  tooling:
+    app: tooling
+    project: tooling
     sourceType: directory
     naming: basename
-    contentRepo: content-devsecops
+    contentRepo: content-tooling
     discovery:
       include: [raw/*]
     destinations:
       - namespace: "*"
 
-  # --- Leaves declaring their own chart -------------------------------------------------------------
+  # --- Charts that live in the content repository -----------------------------------------------------
   # charts/<tool>/ IS a chart: its Chart.yaml lists the upstream chart as a dependency, so adding a tool is
-  # a commit in the content repository and never a redeploy of this chart. Shares the `devsecops` prefix and
+  # a commit in the content repository and never a redeploy of this chart. Shares the `tooling` prefix and
   # project with the entry above, hence the explicit object name.
-  devsecops-charts:
-    name: devsecops-charts
-    app: devsecops
-    project: devsecops
+  tooling-charts:
+    name: tooling-charts
+    app: tooling
+    project: tooling
     sourceType: gitChart
     naming: basename
-    contentRepo: content-devsecops
+    contentRepo: content-tooling
     discovery:
       include: [charts/*]
       leaf: Chart.yaml
@@ -92,14 +92,14 @@ applicationsets:
 
 applications:
   # --- Two charts in ONE object -------------------------------------------------------------------
-  # we-chart plus an upstream chart, each with its own FLAT values files, where an umbrella Chart.yaml
-  # would nest every file under a subchart key. No generator: one path, one namespace.
-  weresources:
-    app: devsecops
-    project: devsecops
-    contentRepo: content-devsecops
-    path: singleton/weresources
-    namespace: devsecops-weresources
+  # The in-house chart plus an upstream one, each with its own FLAT values files, where an umbrella
+  # Chart.yaml would nest every file under a subchart key. No generator: one path, one namespace.
+  quotas:
+    app: tooling
+    project: tooling
+    contentRepo: content-tooling
+    path: singleton/quotas
+    namespace: tooling-quotas
     charts:
-      - repo: we-chart
+      - repo: base-chart
         version: "3.0.0-1"

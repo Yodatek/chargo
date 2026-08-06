@@ -60,10 +60,10 @@ global:
 # contradict it.
 #
 #   credentials:
-#     gitlab-forge:
-#       username: CAPTAIN_RIMAFLOWA          # an account name is not secret
+#     forge:
+#       username: chargo-bot                 # an account name is not secret
 #       password:                            # its token is
-#         key: /static-secrets/data/devsecops/int
+#         key: secret/data/platform/int
 #         property: GITLAB_FORGE_PASSWORD    # optional, defaults to the field name
 #         version: ""                        # optional
 #
@@ -83,6 +83,8 @@ credentials: {}
 #   url:         clone URL, or the helm registry base URL
 #   name:        helm only — chart name (defaults to the dictionary key)
 #   version:     helm only — default chart version, overridable per object
+#   enableOCI:   helm only — the registry speaks OCI (ghcr.io, Harbor, ECR…). The url then carries no
+#                scheme: `ghcr.io/<org>/charts`, and `name` is the chart inside it.
 #   credentials: key of `credentials`; omit ONLY for a public repository, which ArgoCD pulls anonymously
 repositories: {}
 
@@ -116,7 +118,7 @@ repositories: {}
 #   chartVersion:    registryChart only — overrides the version declared on that repository
 #   charts:          registryChart only — N charts in ONE object, each with its own FLAT values files,
 #                    where an umbrella Chart.yaml would nest every file under a subchart key:
-#                      - repo: we-chart          # key of `repositories`
+#                      - repo: base-chart        # key of `repositories`
 #                        version: "3.0.0-1"      # optional, overrides the repository default
 #                        releaseName: redis      # optional, defaults to the chart name
 #                        valueFiles: [...]       # optional, defaults to discovery.valueFiles
@@ -168,7 +170,7 @@ objectDefaults:
   # --- NO WORKLOAD SECRET HERE --------------------------------------------------------------------
   # chargo renders nothing outside the ArgoCD namespace. A secret a workload needs belongs beside that
   # workload, declared by whatever the workload is declared with:
-  #   a chart      we-chart creates it from its own `global.pullSecrets` and references it
+  #   a chart      the chart creates it from its own `global.pullSecrets` and references it
   #   raw YAML     an `ExternalSecret` committed in the content repository, next to the Deployment. It
   #                holds a POINTER, not the material, so it needs no SOPS decryptor to sit in git.
   #

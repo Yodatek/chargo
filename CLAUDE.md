@@ -46,7 +46,7 @@ The directory tree names the **Application**. It does not name the workloads.
                  <app>-<leaf directory>                (naming: basename)
     namespace  = <app>-<first path segment>
 
-Inside a namespace, the objects we-chart creates are named from `global.app`, the component key and
+Inside a namespace, the objects an application chart creates are named from `global.app`, the component key and
 `global.deploymentType`. So the rule that matters when several leaves share a namespace is:
 
 > the pair (`global.app`, `global.deploymentType`) must be unique per leaf in a namespace.
@@ -91,7 +91,7 @@ cat /tmp/out/chargo/templates/*.yaml > /tmp/r.yaml && python3 hack/validate-rend
   and a truncated stream looks exactly like a YAML error.
 - **Watch the `---`.** A `-}}` right before it eats the newline, the separator glues to the previous line,
   and two objects silently merge into one document — the later overwriting the earlier. Invariant #1 of
-  `validate-render.py` exists because that shipped once in we-chart.
+  `validate-render.py` exists because that has shipped before.
 
 Both `values.example.yaml` (literal credentials) and `values.example-external.yaml` (pointer credentials)
 are rendered by CI. A change that touches the secret path must keep both green.

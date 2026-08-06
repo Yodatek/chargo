@@ -7,7 +7,7 @@ chart whose entire output is ArgoCD objects:
 1. NO GLUED DOCUMENT SEPARATOR — a `---` must start its own line. Whitespace trimming (`-}}`) can glue it
    to the previous line, which silently STOPS it from separating documents: two objects then land in the
    SAME YAML document and the later one OVERWRITES the earlier. `grep` cannot see this; a parser can.
-   This shipped once in we-chart (3.0.0-2), where an Ingress swallowed another.
+   It has shipped before, in a sibling chart, where one Ingress swallowed another.
 
 2. OBJECT COUNT MATCHES — the number of top-level `kind:` lines must equal the number of objects a YAML
    parser actually yields. A mismatch is the generic signature of invariant #1.
