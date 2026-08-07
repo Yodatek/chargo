@@ -1,5 +1,10 @@
 ![chargo — one values file, every ArgoCD object of a platform](docs/banner.svg)
 
+> **Development happens on [github.com/Yodatek/chargo](https://github.com/Yodatek/chargo).** Any other copy
+> of this repository is a mirror, kept in step by pushing the same commits to both. Open your change
+> upstream, merge it there, and let it travel — a commit landed only on a mirror makes the two diverge, and
+> the next push is refused until someone reconciles them by hand.
+
 Renders the ArgoCD objects of **one platform** from **one values file**: ApplicationSets, Applications,
 AppProjects and repository credentials.
 
