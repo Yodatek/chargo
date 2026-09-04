@@ -84,7 +84,7 @@ way to break this chart.
 
 ```bash
 helm template chargo . -f values.example.yaml --output-dir /tmp/out
-cat /tmp/out/chargo/templates/*.yaml > /tmp/r.yaml && python3 hack/validate-render.py /tmp/r.yaml
+python3 hack/validate-render.py /tmp/out/chargo/templates/*.yaml
 ```
 
 - **Use `--output-dir`.** Piping `helm template` into another command gets truncated in some shells here,

@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Validate a rendered chargo manifest — catches what `helm lint` cannot see.
 
-Reads a `helm template` output (file argument or stdin) and enforces the invariants that matter for a
-chart whose entire output is ArgoCD objects:
+Reads `helm template` output — one or more file arguments, or stdin — and enforces the invariants that
+matter for a chart whose entire output is ArgoCD objects. Every input is pooled, so a glob over an
+`--output-dir` tree is checked as one render: the by-name invariants below need the AppProjects and the
+Applications in the same pass to mean anything.
 
 1. NO GLUED DOCUMENT SEPARATOR — a `---` must start its own line. Whitespace trimming (`-}}`) can glue it
    to the previous line, which silently STOPS it from separating documents: two objects then land in the
@@ -45,7 +47,14 @@ except ImportError:
     sys.exit("PyYAML is required (apk add py3-yaml / pip install pyyaml)")
 
 KIND_LINE = re.compile(r"^kind:\s*(\S+)", re.MULTILINE)
-GLUED_SEPARATOR = re.compile(r"^(?!---$).+---\s*$")
+# A `---` GLUED to the end of a line: three dashes preceded by a character that is neither a dash nor
+# whitespace, which is exactly what "something was printed right before the separator" looks like.
+#
+# Both exclusions carry their weight. Whitespace lets a legitimately indented `---` through — inside a
+# block scalar it is text, not a separator. The dash lets PEM through: `-----BEGIN CERTIFICATE-----`
+# ends in three dashes too, and every config block mounting a CA carries two such lines, which is
+# enough false positives to make the whole check ignored.
+GLUED_SEPARATOR = re.compile(r"[^-\s]---\s*$")
 APP_KINDS = {"Application", "ApplicationSet"}
 
 
@@ -66,30 +75,45 @@ def find_markers(node, path=""):
         yield path
 
 
+def read_sources(paths):
+    """`(label, text)` per input — every path given, or stdin when none is.
+
+    Several files stay SEPARATE rather than being concatenated: the glued-separator check reports a line
+    number, and pooling the texts would report it against the wrong file. Concatenating would also invent
+    a document boundary between two renders, or lose one — the very accident this script exists to catch.
+    """
+    if not paths:
+        return [("<stdin>", sys.stdin.read())]
+    return [(p, open(p).read()) for p in paths]
+
+
 def main() -> int:
-    raw = open(sys.argv[1]).read() if len(sys.argv) > 1 else sys.stdin.read()
+    sources = read_sources(sys.argv[1:])
     errors = []
 
     # --- 1. glued `---` -----------------------------------------------------------------------------
     glued = [
-        (n, line)
+        (label, n, line)
+        for label, raw in sources
         for n, line in enumerate(raw.splitlines(), start=1)
-        if GLUED_SEPARATOR.match(line)
+        if GLUED_SEPARATOR.search(line)
     ]
     if glued:
         errors.append(
             "glued document separator(s) — `---` is not at the start of its line, so it does NOT "
             "separate documents (drop the `-` from the `-}}` that precedes it):"
         )
-        errors += [f"    line {n}: {line!r}" for n, line in glued]
+        errors += [f"    {label} line {n}: {line!r}" for label, n, line in glued]
 
     # --- 2. declared kinds vs parsed objects --------------------------------------------------------
-    declared = KIND_LINE.findall(raw)
-    try:
-        objects = [d for d in yaml.safe_load_all(raw) if d]
-    except yaml.YAMLError as exc:
-        print(f"::error:: rendered manifest is not valid YAML: {exc}", file=sys.stderr)
-        return 1
+    declared, objects = [], []
+    for label, raw in sources:
+        declared += KIND_LINE.findall(raw)
+        try:
+            objects += [d for d in yaml.safe_load_all(raw) if d]
+        except yaml.YAMLError as exc:
+            print(f"::error:: {label} is not valid YAML: {exc}", file=sys.stderr)
+            return 1
 
     if len(declared) != len(objects):
         errors.append(
