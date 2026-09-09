@@ -1,0 +1,37 @@
+name: Feature request
+description: A shape the chart cannot express today
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        chargo is deliberately small: four dictionaries, and one key per question. A new key that only
+        selects between two behaviours is the thing this contract exists to avoid — so the third field
+        below is the one that matters.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you are trying to deploy
+      description: The platform, the content repository layout, the ArgoCD objects you need
+    validations:
+      required: true
+
+  - type: textarea
+    id: blocked
+    attributes:
+      label: Where the current contract stops you
+      description: The values file you would write, and what it renders today
+      render: yaml
+    validations:
+      required: true
+
+  - type: textarea
+    id: shape
+    attributes:
+      label: Why no existing key covers it
+      description: |
+        Could the *shape* of an existing value decide, instead of a new key? Could `objectDefaults`, a
+        second entry, or an explicit `name:` do it? Say what you ruled out.
+    validations:
+      required: true
