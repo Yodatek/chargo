@@ -11,3 +11,9 @@ keywords:
   - argocd
   - gitops
   - applicationset
+home: https://github.com/Yodatek/chargo
+sources:
+  - https://github.com/Yodatek/chargo
+maintainers:
+  - name: Yodatek
+    url: https://github.com/Yodatek
