@@ -50,6 +50,14 @@ jobs:
           path: rendered.yaml
           retention-days: 7
 
+  shell:
+    # hack/bootstrap.sh installs chargo with nothing but bash, which is also what leaves it unguarded: no
+    # renderer, no type checker. shellcheck is the whole safety net, and the runner ships it.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: shellcheck hack/*.sh
+
   logo:
     # docs/logo.svg and docs/banner.svg are generated: the tapered arms are ~60-point polygons nobody edits
     # by hand. This fails if someone edited the output instead of docs/build-logo.py.

@@ -31,6 +31,16 @@ helm:validate:
       - rendered-external.yaml
     expire_in: 1 week
 
+# hack/bootstrap.sh installs chargo with nothing but bash, which is also what leaves it unguarded: no
+# renderer, no type checker. shellcheck is the whole safety net.
+shell:lint:
+  stage: validate
+  image:
+    name: koalaman/shellcheck-alpine:v0.10.0
+    entrypoint: [""]
+  script:
+    - shellcheck hack/*.sh
+
 # docs/logo.svg and docs/banner.svg are generated: the tapered arms are ~60-point polygons nobody edits by
 # hand. Fails if someone edited the output instead of docs/build-logo.py.
 logo:drift:
