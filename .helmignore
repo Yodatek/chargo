@@ -20,11 +20,16 @@
 .idea/
 *.tmproj
 
-# CI tooling and contributor guidance — not part of the chart
+# CI tooling and contributor guidance — not part of the chart. README and LICENSE stay: chart registries
+# render them.
 hack/
 .gitlab-ci.yml
 .github/
 CLAUDE.md
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+SECURITY.md
+CHANGELOG.md
 # Brand assets: `icon` in Chart.yaml fetches the logo by URL, so the package needs none of this
 docs/
 # Per-platform values live in the deploying repo, not in the package

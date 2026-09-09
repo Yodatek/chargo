@@ -1,0 +1,64 @@
+name: Bug report
+description: A render that produces the wrong ArgoCD objects, or fails when it should not
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        `helm template` is deterministic and needs no cluster, so a rendered manifest settles almost every
+        question in one round trip. Paste the output, not a description of it — and redact credentials.
+
+        A security problem goes to the [security policy](../security/policy) instead, never here.
+
+  - type: input
+    id: chart-version
+    attributes:
+      label: chargo version
+      description: Chart version, or the commit you rendered
+      placeholder: "0.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: versions
+    attributes:
+      label: Helm and ArgoCD versions
+      placeholder: "helm 3.16.3, argocd 2.13.1"
+    validations:
+      required: true
+
+  - type: textarea
+    id: values
+    attributes:
+      label: Values file
+      description: The smallest values file that reproduces it. Redact credentials.
+      render: yaml
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: What you ran
+      value: |
+        helm template chargo . -f values.yaml --output-dir /tmp/out
+        python3 hack/validate-render.py /tmp/out/chargo/templates/*.yaml
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: got
+    attributes:
+      label: What you got
+      description: The rendered object, or the error
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
