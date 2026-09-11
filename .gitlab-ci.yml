@@ -52,33 +52,44 @@ logo:drift:
     - python3 docs/build-logo.py
     - git diff --exit-code -- docs/
 
-helm:package:
-  stage: package
+# The `version` in Chart.yaml is the trigger AND the single source of truth. A push to the default branch
+# publishes it if, and only if, no tag carries it yet — so re-running on an unchanged version does nothing
+# and a release is one commit, never a commit plus a tag someone has to remember.
+#
+# There is no tag to write by hand, so there is no tag that can disagree with Chart.yaml. The check this
+# replaces compared `v$VERSION` against the tag and printed both WITHOUT the prefix, so a tag named
+# `0.2.0` failed with `tag 0.2.0 != Chart.yaml 0.2.0`.
+#
+# Needs CI_RW_ACCESS_TOKEN — a project or group token with write_repository, which is what pushes the tag.
+# CI_JOB_TOKEN cannot: it may publish a package, never write to the repository.
+helm:release:
+  stage: deploy
   needs: ["helm:validate"]
   image:
     name: alpine/helm:3.16.3
     entrypoint: [""]
-  script:
-    - helm package .
-  artifacts:
-    paths:
-      - chargo-*.tgz
-  rules:
-    - if: $CI_COMMIT_TAG
-
-# The tag must match `version` in Chart.yaml — publishing a version nobody asked for is worse than failing.
-helm:deploy:
-  stage: deploy
-  needs: ["helm:package"]
-  image: alpine:3.20
   before_script:
-    - apk add --no-cache curl yq
+    - apk add --no-cache git curl yq
     - export VERSION="$(yq '.version' Chart.yaml)"
   script:
-    - test "v${VERSION}" = "${CI_COMMIT_TAG}" || { echo "tag ${CI_COMMIT_TAG} != Chart.yaml ${VERSION}"; exit 1; }
+    - |
+      if git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" >/dev/null 2>&1; then
+        echo "v${VERSION} is already released — nothing to do."
+        exit 0
+      fi
+    - helm package .
     - |
       curl --fail --request POST --user "gitlab-ci-token:${CI_JOB_TOKEN}" \
         --form "chart=@chargo-${VERSION}.tgz" \
         "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/helm/api/stable/charts"
+    # The tag is a RECORD of what was published, written after the fact. It is also what makes the job
+    # idempotent, so it is pushed last: a failed publish leaves no tag and the next run retries.
+    - git config user.name "${GITLAB_USER_NAME}"
+    - git config user.email "${GITLAB_USER_EMAIL}"
+    - git tag -a "v${VERSION}" -m "Release ${VERSION}"
+    - git push "https://gitlab-ci-token:${CI_RW_ACCESS_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" "v${VERSION}"
+  artifacts:
+    paths:
+      - chargo-*.tgz
   rules:
-    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

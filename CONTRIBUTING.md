@@ -78,7 +78,7 @@ Before opening a pull request:
 - [ ] `hack/bootstrap.sh` still passes `shellcheck`, if you touched it
 - [ ] new or changed keys are documented in `values.yaml`, where the contract lives
 - [ ] an entry added under `## Unreleased` in [CHANGELOG.md](CHANGELOG.md)
-- [ ] `version` in `Chart.yaml` left alone — maintainers bump it when they cut a release
+- [ ] `version` in `Chart.yaml` left alone — bumping it on `main` IS the release, so maintainers do it
 
 A breaking change is acceptable. Remove the old key rather than keeping both, and say so in the changelog
 entry.
