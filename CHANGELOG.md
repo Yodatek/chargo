@@ -22,6 +22,22 @@ the new one, and the entry below carries the migration note.
 
 ### Changed
 
+- **`releaseName` of a `registryChart` defaults to the App name, not to the app prefix.** Inside a set
+  every generated App used to get the SAME release name, so `.Release.Name` identified the set rather
+  than the Application. An application chart that qualifies a namespace-wide object with it — a pull
+  secret, a shared config block — then rendered one name for the whole set, and ArgoCD stamps a single
+  tracking id per object: every other Application reads it as owned by someone else, therefore as
+  missing, and reports OutOfSync forever. Measured on one platform, 23 Applications were stuck that way
+  on one pull secret, on byte-identical content.
+
+  The `gitChart` and `directory` branches are unchanged: their default is already per leaf.
+
+  Migration: none unless a chart names objects after `.Release.Name`, in which case those objects are
+  renamed and replaced. Pin the old value with `releaseName:` on the entry to avoid it.
+
+- The App name is built once, in `chargo.appName`, and `chargo.appMetadata` and the `releaseName`
+  default both read it. It used to be spelled out in two places that could drift.
+
 - README rewritten for readers outside the project that grew it: requirements, three documented install
   paths, and the `sourceType`, discovery and naming contracts that previously lived only in `values.yaml`.
 
