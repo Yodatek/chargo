@@ -25,7 +25,7 @@ others' allowances; ArgoCD would then refuse whatever the loser needed.
        and asking chartList for coordinates they do not have would report a missing version instead of the
        real mistake. */ -}}
 {{- if eq $src "registryChart" -}}
-{{- range $c := (include "chargo.chartList" (dict "root" $ "key" $key "entry" $e) | fromJsonArray) -}}
+{{- range $c := (include "chargo.chartList" (dict "root" $ "key" $key "entry" $e "mode" (ternary "set" "app" (eq $kind "applicationsets"))) | fromJsonArray) -}}
 {{- $repos = append $repos $c.url -}}
 {{- end -}}
 {{- end -}}
