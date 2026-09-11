@@ -2,8 +2,8 @@ apiVersion: v2
 name: chargo
 description: Renders the ArgoCD objects of one platform — ApplicationSets, Applications, AppProjects and repository credentials
 type: application
-version: 0.1.0
-appVersion: "0.1.0"
+version: 0.2.0
+appVersion: "0.2.0"
 # Rendered by helm UIs and by ArgoCD. Points at the raw file of the default branch, so it follows the
 # logo without a release. Regenerate with docs/build-logo.py.
 icon: https://raw.githubusercontent.com/Yodatek/chargo/main/docs/logo.png
