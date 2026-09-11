@@ -6,7 +6,7 @@ and the chart version follows [SemVer](https://semver.org).
 Before 1.0.0, a breaking change may land in a minor version. The old key is removed rather than kept beside
 the new one, and the entry below carries the migration note.
 
-## Unreleased
+## 0.2.0 — 2026-09-11
 
 ### Added
 
