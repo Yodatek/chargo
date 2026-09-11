@@ -35,6 +35,12 @@ the new one, and the entry below carries the migration note.
   Migration: none unless a chart names objects after `.Release.Name`, in which case those objects are
   renamed and replaced. Pin the old value with `releaseName:` on the entry to avoid it.
 
+- **A release is one commit.** `version` in `Chart.yaml` is the trigger: a push to `main` publishes it
+  when no `vX.Y.Z` tag carries it yet, and the tag is written afterwards as a record. Nothing is tagged
+  by hand, so nothing can disagree with `Chart.yaml`. The check this replaces compared `v$VERSION`
+  against the tag and printed both WITHOUT the prefix, so a tag named `0.2.0` failed with the unreadable
+  `tag 0.2.0 != Chart.yaml 0.2.0`. On GitLab the job needs `CI_RW_ACCESS_TOKEN` to push the tag.
+
 - The App name is built once, in `chargo.appName`, and `chargo.appMetadata` and the `releaseName`
   default both read it. It used to be spelled out in two places that could drift.
 

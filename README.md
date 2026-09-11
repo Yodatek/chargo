@@ -364,9 +364,13 @@ output drifts from the generator.
 
 ## Versioning
 
-The chart follows [SemVer](https://semver.org). A release tag is `vX.Y.Z` and must match `version` in
-`Chart.yaml` — CI refuses to publish otherwise. Each release publishes the chart to
-`oci://ghcr.io/yodatek/charts/chargo` and attaches the `.tgz` to a
+The chart follows [SemVer](https://semver.org). **A release is one commit: bump `version` in
+`Chart.yaml` and push it to `main`.** CI publishes that version if no `vX.Y.Z` tag carries it yet, then
+writes the tag as a record — so nothing has to be tagged by hand, and no tag can disagree with
+`Chart.yaml`. Pushing the same version again does nothing.
+
+Each release publishes the chart to `oci://ghcr.io/yodatek/charts/chargo`, to the GitLab package
+registry of the mirror, and attaches the `.tgz` to a
 [GitHub Release](https://github.com/Yodatek/chargo/releases).
 
 Before 1.0.0, a breaking change may land in a minor version. The old key is removed rather than kept beside

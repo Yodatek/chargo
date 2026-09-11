@@ -1,15 +1,16 @@
 name: release
 
-# Publishes the chart as an OCI artifact on ghcr.io and attaches the .tgz to a GitHub Release.
-# Inert until a tag is pushed:
+# The `version` in Chart.yaml is the trigger AND the single source of truth. A push to main publishes it
+# if, and only if, no tag carries it yet — so a release is one commit, and re-running on an unchanged
+# version does nothing. There is no tag to write by hand, so there is no tag that can disagree with
+# Chart.yaml.
 #
-#   git tag -a v0.1.0 -m "chargo 0.1.0" && git push origin v0.1.0
-#
-# The tag must match `version` in Chart.yaml — a mismatch publishes a version nobody asked for, so it is a
-# hard failure rather than a surprise in the registry.
+# Publishes the chart as an OCI artifact on ghcr.io, attaches the .tgz to a GitHub Release, and lets that
+# release create the tag.
 on:
   push:
-    tags: ['v*']
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -20,31 +21,41 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Tags are how the job knows what is already out. A shallow checkout carries none.
+          fetch-depth: 0
 
       - uses: azure/setup-helm@v4
         with:
           version: v3.16.3
 
-      - name: Read the chart version and check it against the tag
+      - name: Decide whether this version is new
         id: chart
         run: |
           version="$(helm show chart . | awk '/^version:/ {print $2}')"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
-          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
-            echo "::error::tag ${GITHUB_REF_NAME} does not match Chart.yaml version ${version}"
-            exit 1
+          if git rev-parse -q --verify "refs/tags/v${version}" >/dev/null; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "v${version} is already released — nothing to do."
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - run: helm package .
+      - if: steps.chart.outputs.publish == 'true'
+        run: helm package .
 
       # OCI references are lowercase; the org name is not necessarily.
       - name: Push to ghcr.io
+        if: steps.chart.outputs.publish == 'true'
         run: |
           owner="${GITHUB_REPOSITORY_OWNER,,}"
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
           helm push "chargo-${{ steps.chart.outputs.version }}.tgz" "oci://ghcr.io/${owner}/charts"
 
+      # Creates the tag as well: it is a record of what was published, not the thing that triggered it.
       - uses: softprops/action-gh-release@v2
+        if: steps.chart.outputs.publish == 'true'
         with:
+          tag_name: v${{ steps.chart.outputs.version }}
           files: chargo-${{ steps.chart.outputs.version }}.tgz
           generate_release_notes: true
