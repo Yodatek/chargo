@@ -25,6 +25,8 @@
 hack/
 .gitlab-ci.yml
 .github/
+# Repository metadata for Artifact Hub, read from the registry rather than from the package
+artifacthub-repo.yml
 CLAUDE.md
 CONTRIBUTING.md
 CODE_OF_CONDUCT.md

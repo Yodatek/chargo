@@ -1,0 +1,15 @@
+# Claims the chargo repository on Artifact Hub. Without it the package page shows up unowned, and the
+# publisher can never be verified.
+#
+# Artifact Hub does NOT read this file from git. It reads it from the OCI registry, at the fixed tag
+# `artifacthub.io` beside the chart — .github/workflows/release.yml pushes it there on every release.
+#
+# Order of operations, once:
+#   1. Add the repository on artifacthub.io — kind Helm, URL oci://ghcr.io/yodatek/charts/chargo
+#   2. Copy the ID from its card in the control panel into `repositoryID` below
+#   3. Release, so the file reaches the registry carrying that ID
+repositoryID: CHANGE_ME
+# The email of the Artifact Hub account claiming the repository. It must match, or the claim is refused.
+owners:
+  - name: Yodatek
+    email: CHANGE_ME
