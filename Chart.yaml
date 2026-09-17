@@ -2,8 +2,8 @@ apiVersion: v2
 name: chargo
 description: Renders the ArgoCD objects of one platform — ApplicationSets, Applications, AppProjects and repository credentials
 type: application
-version: 0.2.0
-appVersion: "0.2.0"
+version: 0.3.0
+appVersion: "0.3.0"
 # Rendered by helm UIs and by ArgoCD. Points at the raw file of the default branch, so it follows the
 # logo without a release. Regenerate with docs/build-logo.py.
 icon: https://raw.githubusercontent.com/Yodatek/chargo/main/docs/logo.png
@@ -39,16 +39,8 @@ annotations:
   # package page describing the wrong version.
   artifacthub.io/changes: |
     - kind: added
-      description: hack/bootstrap.sh installs chargo into an ArgoCD instance with nothing but bash
+      description: Artifact Hub metadata — the annotations below, and a repository ownership file
     - kind: added
-      description: Contributing, security and conduct files, a changelog, and issue templates
-    - kind: added
-      description: home, sources and maintainers in Chart.yaml, so registries point back at the project
-    - kind: added
-      description: shellcheck job in CI, guarding hack/
-    - kind: changed
-      description: "Breaking: releaseName of a registryChart defaults to the App name, not to the app prefix"
-    - kind: changed
-      description: A release is one commit — version in Chart.yaml triggers it, the tag is written after
-    - kind: fixed
-      description: hack/validate-render.py accepts several files, so an --output-dir tree is one render
+      description: Keywords argo-cd, appproject and continuous-delivery
+    - kind: removed
+      description: The GitHub Release for 0.2.0 and its tag; the chart itself stays on the registry

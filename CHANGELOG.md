@@ -6,6 +6,25 @@ and the chart version follows [SemVer](https://semver.org).
 Before 1.0.0, a breaking change may land in a minor version. The old key is removed rather than kept beside
 the new one, and the entry below carries the migration note.
 
+## 0.3.0 — 2026-09-17
+
+### Added
+
+- Artifact Hub metadata, so the chart is findable where Helm charts are searched for.
+  `Chart.yaml` carries the annotations Artifact Hub reads — category, license, links and the
+  changes of the release — and `artifacthub-repo.yml` claims the repository. Artifact Hub takes
+  that file from the fixed `artifacthub.io` tag beside the chart in the OCI registry, never from
+  git, so the release workflow pushes it there with `oras`.
+- Keywords `argo-cd`, `appproject` and `continuous-delivery`. `argo-cd` and `argocd` are both
+  searched, and a registry matches the spelling it is given.
+
+### Removed
+
+- The GitHub Release for 0.2.0, and its tag. The chart is untouched on
+  `oci://ghcr.io/yodatek/charts/chargo`, so `--version 0.2.0` still resolves; only the tarball
+  attached to the GitHub release is gone. `v0.2.0` cannot be created again on that repository,
+  which is why this release is 0.3.0 rather than 0.2.1.
+
 ## 0.2.0 — 2026-09-11
 
 ### Added
