@@ -52,10 +52,12 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
           helm push "chargo-${{ steps.chart.outputs.version }}.tgz" "oci://ghcr.io/${owner}/charts"
 
+      # The version must be one this action knows, not simply the newest oras release: the action
+      # validates it against a checksum list baked into the tag. v2 stops at 1.3.3.
       - uses: oras-project/setup-oras@v2
         if: steps.chart.outputs.publish == 'true'
         with:
-          version: 1.3.4
+          version: 1.3.3
 
       # Artifact Hub takes the repository's ownership file from a fixed tag beside the chart, never from
       # git. Pushed on every release, so the claim outlives a registry that was emptied and refilled.
